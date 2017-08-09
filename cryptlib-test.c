@@ -40,66 +40,51 @@
 #include <string.h>
 #include <cryptlib/cryptlib.h>
 
-#define MAXLINE 200
-#define cryptUser CRYPT_UNUSED
+void hexdump(FILE* f, const void *data_, int length){
 
-int  status;
-
-
-int print_hash(unsigned char buf[], int length){
-
-    unsigned char * pin = buf;
-    char str[2*length + 1];
-    const char * hex = "0123456789abcdef";
-    char * pout = str;
-    for(;  pin < buf+length; pout+=2, pin++){
-        pout[0] = hex[(*pin>>4) & 0xF];
-        pout[1] = hex[ *pin     & 0xF];
+    const char *hexmap = "0123456789abcdef";
+    const char *data = (const char *)data_;
+    char ch[2];
+    int i;
+    for (i=0; i<length; i++){
+        ch[0] = hexmap[0x0F & (data[i]>>4)];
+        ch[1] = hexmap[0x0F & data[i]];
+        fprintf(f, "%c%c", ch[0], ch[1]);
     }
-    pout[0] = 0;
-    printf("Hex      : %s \n",str);
-    if (strcmp(str, "6dabb4f4a33f91cd45eb9c4c6f6bca08967615c7") != 0) {
-        return 1;
-    }
-    return 0;
 }
 
 /***************************************************************************************/
 int main (int argc, char *args[]) {
 
-    char buffer[MAXLINE] = "cryptlib";
-    char hashName[MAXLINE];
-    char hashValue[MAXLINE];
-    int length = strlen(buffer);
+    int  status;
+
+    char message[1024] = "cryptlib";
+    int length = strlen(message);
 
     status = cryptInit();
-    puts("Cryptlib : performing basic hash test in C.\n");
+    printf("Cryptlib: performing basic hash test in C.\n");
     if( status != CRYPT_OK ){
-        puts("CryptLib initialisation failed.");
+        printf("CryptLib initialisation failed!\n");
         exit(2);
     }
 
     CRYPT_CONTEXT hashContext;
-    unsigned char hash[ CRYPT_MAX_HASHSIZE ];
-    int hashLength;
-    int numBytes;
+    const CRYPT_USER cryptUser = CRYPT_UNUSED;
+    const CRYPT_ALGO_TYPE hashAlgo = CRYPT_ALGO_SHA1;
+    unsigned char digest[ CRYPT_MAX_HASHSIZE ];
+    int digestLength;
 
-    /* CRYPT_CTXINFO_NAME_ALGO hashName; */
-
-    status = cryptCreateContext( &hashContext, cryptUser, CRYPT_ALGO_SHA1 );
+    status = cryptCreateContext( &hashContext, cryptUser, hashAlgo );
     cryptAddRandom( NULL, CRYPT_RANDOM_SLOWPOLL );
-    cryptEncrypt( hashContext, buffer, length );
-    cryptEncrypt( hashContext, buffer, 0 );
-    status = cryptGetAttributeString( hashContext, CRYPT_CTXINFO_HASHVALUE, hash, &hashLength );
-    status = cryptGetAttributeString( hashContext, CRYPT_CTXINFO_NAME_ALGO, hashName, &numBytes );
-    printf("Hash algo: %s \n",hashName);
-    printf("Data     : %s \n",buffer);
-    printf("Hash     : %s \n",hash);
-    status = print_hash(hash, 20);
-    if (status)
-        puts("ERROR: sha1 hash failed.");
-    else
-        puts("SUCCESS  sha1 hash succeeded.");
+    cryptEncrypt( hashContext, message, length );
+    cryptEncrypt( hashContext, message, 0 );
+    status = cryptGetAttributeString( hashContext, CRYPT_CTXINFO_HASHVALUE, digest, &digestLength );
+    printf("Message: %s\n", message);
+    printf("Message length: %d bytes\n", length);
+    printf("SHA1 digest: ");
+    hexdump(stdout, digest, 20);
+    printf("\n");
+    printf("Expected value: 6dabb4f4a33f91cd45eb9c4c6f6bca08967615c7\n");
     cryptDestroyContext( hashContext );
     status = cryptEnd();
 }
